@@ -113,6 +113,7 @@
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Settings */
+  #setting-btn{display:none;}
   .settings-card { background: var(--surface); border-radius: var(--radius);
                    padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px; }
   .settings-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--navy); }
@@ -170,7 +171,7 @@
       <div class="sub" id="today-label">Today</div>
       <h1>Family Finance</h1>
     </div>
-    <button class="icon-btn" onclick="showScreen('s-settings')" aria-label="Settings">⚙️</button>
+    <button class="icon-btn" onclick="showScreen('s-settings')" aria-label="Settings" id="setting-btn">⚙️</button>
     <button class="icon-btn" onclick="loadEntries()" aria-label="Refresh" id="refresh-btn">🔄</button>
   </div>
 
