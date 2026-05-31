@@ -113,7 +113,6 @@
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Settings */
-  #setting-btn{display:none;}
   .settings-card { background: var(--surface); border-radius: var(--radius);
                    padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px; }
   .settings-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--navy); }
@@ -171,7 +170,6 @@
       <div class="sub" id="today-label">Today</div>
       <h1>Family Finance</h1>
     </div>
-    <button class="icon-btn" onclick="showScreen('s-settings')" aria-label="Settings" id="setting-btn">⚙️</button>
     <button class="icon-btn" onclick="loadEntries()" aria-label="Refresh" id="refresh-btn">🔄</button>
   </div>
 
@@ -255,73 +253,13 @@
   </div>
 </div>
 
-<!-- ── SETTINGS SCREEN ─────────────────────────────────────────────────────── -->
-<div id="s-settings" class="screen">
-  <div class="topbar">
-    <button class="icon-btn" onclick="showScreen('s-home')" aria-label="Back">←</button>
-    <h1>Settings</h1>
-  </div>
-
-  <div class="content">
-
-    <div class="settings-card">
-      <h3>🔗 Google Sheets connection</h3>
-      <p>Paste your Apps Script Web App URL below. Both you and your spouse use the same URL — all entries go to the same Google Sheet.</p>
-      <input type="url" id="webhook-url" placeholder="https://script.google.com/macros/s/…/exec"
-             oninput="saveUrl()">
-      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;">
-        <span class="status-dot dot-gray" id="conn-dot"></span>
-        <span id="conn-status" style="color:var(--muted);">Not connected</span>
-      </div>
-      <button class="sec-btn" onclick="testConnection()" style="margin-top:10px;">Test connection</button>
-    </div>
-
-    <div class="settings-card">
-      <h3>📋 Setup guide</h3>
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-text">Go to <code>sheets.new</code> and create a blank Google Sheet.</div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-text">Click <code>Extensions → Apps Script</code>. Delete all code and paste the <strong>Code.gs</strong> file content.</div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-text">Click <code>▶ Run → setupSheet</code>. Grant permissions when prompted. This formats your sheet.</div>
-      </div>
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-text">Click <code>Deploy → New Deployment</code>. Set Type: <strong>Web App</strong>, Execute as: <strong>Me</strong>, Access: <strong>Anyone</strong>. Click Deploy.</div>
-      </div>
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-text">Copy the Web App URL and paste it in the field above. Tap <strong>Test connection</strong>.</div>
-      </div>
-      <div class="step">
-        <div class="step-num">6</div>
-        <div class="step-text">Share this URL with your spouse — they open it on their phone and enter the same Web App URL in settings.</div>
-      </div>
-    </div>
-
-    <div class="settings-card">
-      <h3>📱 Add to home screen</h3>
-      <p>On iPhone: tap the Share button in Safari → "Add to Home Screen".<br>On Android: tap the 3-dot menu in Chrome → "Add to Home screen".</p>
-      <p style="margin-top:8px;">This makes it feel like a native app — full screen, no browser chrome.</p>
-    </div>
-
-    <div class="settings-card">
-      <h3>🗑 Offline queue</h3>
-      <p id="queue-info">Loading…</p>
-      <button class="sec-btn" onclick="flushQueue()" id="flush-btn">Sync offline entries now</button>
-    </div>
-
-  </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
+const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyDknQv93CLYxDOnoeh1FmpuEt8W6QK_n5XfPSzIt6Uso9SiiX4Rf5-dXofC13O_qt4/exec";
+
 const CATS = [
   {id:'Household',        ico:'🏠', label:'Household'},
   {id:'Food & Dining',    ico:'🍽', label:'Food'},
@@ -354,18 +292,14 @@ const LS = {
   setQ:  (q) => localStorage.setItem('ff_queue', JSON.stringify(q)),
 };
 
-function saveUrl() {
-  const url = document.getElementById('webhook-url').value.trim();
-  localStorage.setItem('ff_url', url);
-}
+
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 's-home') { loadEntries(); updateQueueInfo(); }
+  if (id === 's-home') { loadEntries(); }
   if (id === 's-add')  { initAddForm(); }
-  if (id === 's-settings') { initSettings(); }
 }
 
 function switchTab(name, el) {
@@ -433,7 +367,7 @@ async function saveEntry() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Saving…';
 
-  const url = LS.url();
+  const url = WEBHOOK_URL;
   if (!url) {
     // Offline queue
     const q = LS.queue();
@@ -467,7 +401,7 @@ async function saveEntry() {
 // ── Load & render entries ──────────────────────────────────────────────────────
 async function loadEntries() {
   if (isLoading) return;
-  const url = LS.url();
+  const url = WEBHOOK_URL;
   if (!url) { renderHome(); return; }
 
   isLoading = true;
@@ -607,7 +541,7 @@ function renderSummary(allSum) {
 // ── Delete ────────────────────────────────────────────────────────────────────
 async function deleteEntry(id) {
   if (!confirm('Delete this expense?')) return;
-  const url = LS.url();
+  const url = WEBHOOK_URL;
   if (!url) {
     const q = LS.queue().filter(e => String(e._id) !== String(id));
     LS.setQ(q);
@@ -625,7 +559,7 @@ async function deleteEntry(id) {
 async function flushQueue() {
   const q = LS.queue();
   if (!q.length) { toast('No offline entries to sync'); return; }
-  const url = LS.url();
+  const url = WEBHOOK_URL;
   if (!url) { toast('Set up your Google Sheets URL first'); return; }
 
   toast(`Syncing ${q.length} entries…`);
@@ -654,35 +588,12 @@ function updateQueueInfo() {
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
-function initSettings() {
-  document.getElementById('webhook-url').value = LS.url();
-  updateQueueInfo();
-  updateConnStatus('idle');
-}
 
-async function testConnection() {
-  const url = LS.url();
-  if (!url) { toast('Paste your Web App URL first'); return; }
-  updateConnStatus('testing');
-  try {
-    const res = await apiFetch(null, 'action=ping');
-    if (res.ok) { updateConnStatus('ok'); toast('✅ Connected to Google Sheets!'); }
-    else throw new Error();
-  } catch(e) { updateConnStatus('error'); toast('❌ Could not connect — check URL'); }
-}
 
-function updateConnStatus(state) {
-  const dot = document.getElementById('conn-dot');
-  const txt = document.getElementById('conn-status');
-  if (state === 'ok')      { dot.className='status-dot dot-green'; txt.textContent='Connected'; }
-  else if (state==='error'){ dot.className='status-dot dot-red';   txt.textContent='Connection failed'; }
-  else if (state==='testing'){ dot.className='status-dot dot-gray'; txt.textContent='Testing…'; }
-  else { dot.className='status-dot dot-gray'; txt.textContent = LS.url() ? 'URL saved' : 'Not connected'; }
-}
 
 // ── API helper ────────────────────────────────────────────────────────────────
 async function apiFetch(body, qs='') {
-  const base = LS.url();
+  const base = WEBHOOK_URL;
   if (!base) throw new Error('No URL');
   const url = qs ? `${base}?${qs}` : base;
   const opts = body
