@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1B3A6B">
+<title>Family Finance</title>
+<style>
+  :root {
+    --navy: #1B3A6B; --teal: #0D7377; --gold: #F4A825;
+    --red: #C0392B; --green: #117A65; --purple: #6C3483;
+    --bg: #F8F9FA; --surface: #FFFFFF; --border: #E2E8F0;
+    --text: #1A202C; --muted: #718096; --light: #EDF2F7;
+    --radius: 12px; --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh; max-width: 430px;
+         margin: 0 auto; overflow-x: hidden; }
+
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* Top bar */
+  .topbar { background: var(--navy); color: #fff; padding: 16px 16px 12px;
+            display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .topbar h1 { font-size: 17px; font-weight: 600; flex: 1; }
+  .topbar .sub { font-size: 12px; opacity: 0.7; }
+  .icon-btn { background: rgba(255,255,255,0.15); border: none; color: #fff;
+              width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+              display: flex; align-items: center; justify-content: center; font-size: 18px;
+              flex-shrink: 0; }
+  .icon-btn:active { opacity: 0.7; }
+
+  /* Tabs */
+  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+          flex-shrink: 0; }
+  .tab { flex: 1; padding: 12px 4px; text-align: center; font-size: 12px; font-weight: 500;
+         color: var(--muted); border: none; background: none; cursor: pointer;
+         border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab.active { color: var(--navy); border-bottom-color: var(--navy); }
+
+  /* Scrollable content */
+  .content { flex: 1; overflow-y: auto; padding: 14px; -webkit-overflow-scrolling: touch; }
+
+  /* Summary cards */
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px;
+           margin-bottom: 14px; }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 12px;
+          box-shadow: var(--shadow); }
+  .card .lbl { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .card .val { font-size: 20px; font-weight: 700; color: var(--text); }
+  .card.accent { background: var(--navy); }
+  .card.accent .lbl { color: rgba(255,255,255,0.65); }
+  .card.accent .val { color: #fff; }
+
+  /* Entry items */
+  .entry { background: var(--surface); border-radius: var(--radius); padding: 12px 14px;
+           display: flex; align-items: center; gap: 10px; box-shadow: var(--shadow);
+           margin-bottom: 8px; }
+  .entry-icon { width: 38px; height: 38px; border-radius: 50%; display: flex;
+                align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-body .name { font-size: 14px; font-weight: 600; white-space: nowrap;
+                      overflow: hidden; text-overflow: ellipsis; }
+  .entry-body .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .entry-right { text-align: right; flex-shrink: 0; }
+  .entry-right .amt { font-size: 15px; font-weight: 700; }
+  .entry-right .del { background: none; border: none; color: #CBD5E0; font-size: 16px;
+                      cursor: pointer; padding: 4px; margin-top: 2px; display: block;
+                      margin-left: auto; }
+  .entry-right .del:active { color: var(--red); }
+
+  /* Floating add button */
+  .fab { position: fixed; bottom: 24px; right: 20px; width: 56px; height: 56px;
+         border-radius: 50%; background: var(--teal); color: #fff; border: none;
+         font-size: 26px; cursor: pointer; box-shadow: 0 4px 14px rgba(13,115,119,0.4);
+         display: flex; align-items: center; justify-content: center; z-index: 90; }
+  .fab:active { transform: scale(0.93); }
+
+  /* Add expense form */
+  .form-scroll { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+                 text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    padding: 11px 12px; font-size: 15px; color: var(--text); background: var(--surface);
+    appearance: none; -webkit-appearance: none; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--teal); }
+  .amt-input { font-size: 28px !important; font-weight: 700 !important;
+               text-align: center; border-radius: var(--radius) !important;
+               padding: 16px !important; }
+  .cat-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+  .cat-btn { background: var(--surface); border: 1.5px solid var(--border);
+             border-radius: var(--radius); padding: 12px 8px; text-align: center;
+             cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted);
+             transition: all 0.12s; }
+  .cat-btn .ico { font-size: 22px; display: block; margin-bottom: 4px; }
+  .cat-btn.sel { border-color: var(--teal); background: #E8F8F7; color: var(--teal); }
+  .tag-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag { background: var(--light); border: 1.5px solid var(--border); border-radius: 20px;
+         padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--muted); }
+  .tag.sel { background: #E8F8F7; border-color: var(--teal); color: var(--teal);
+             font-weight: 600; }
+  .save-btn { width: 100%; padding: 15px; background: var(--teal); color: #fff;
+              border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600;
+              cursor: pointer; margin-top: 8px; }
+  .save-btn:active { opacity: 0.85; }
+  .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Settings */
+  .settings-card { background: var(--surface); border-radius: var(--radius);
+                   padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px; }
+  .settings-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--navy); }
+  .settings-card p { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+  .settings-card input { width: 100%; border: 1.5px solid var(--border);
+                          border-radius: var(--radius-sm); padding: 10px 12px;
+                          font-size: 13px; color: var(--text); font-family: monospace; }
+  .settings-card input:focus { outline: none; border-color: var(--teal); }
+  .sec-btn { width: 100%; padding: 11px; border: 1.5px solid var(--border);
+             border-radius: var(--radius-sm); background: var(--surface);
+             font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text);
+             margin-top: 8px; }
+  .sec-btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .sec-btn:active { opacity: 0.75; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+                margin-right: 6px; }
+  .dot-green { background: #38A169; }
+  .dot-red { background: var(--red); }
+  .dot-gray { background: #CBD5E0; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+           background: var(--text); color: #fff; padding: 10px 20px; border-radius: 20px;
+           font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none;
+           transition: opacity 0.2s; z-index: 999; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  /* Spinner */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+             border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty .ico { font-size: 40px; margin-bottom: 10px; }
+  .empty p { font-size: 14px; }
+
+  /* Step badge for setup */
+  .step { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
+  .step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--navy);
+              color: #fff; font-size: 12px; font-weight: 700; display: flex;
+              align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .step-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .step-text code { background: var(--light); padding: 1px 6px; border-radius: 4px;
+                    font-size: 12px; color: var(--navy); }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<!-- ── HOME SCREEN ─────────────────────────────────────────────────────────── -->
+<div id="s-home" class="screen active">
+  <div class="topbar">
+    <div style="flex:1">
+      <div class="sub" id="today-label">Today</div>
+      <h1>Family Finance</h1>
+    </div>
+    <button class="icon-btn" onclick="showScreen('s-settings')" aria-label="Settings">⚙️</button>
+    <button class="icon-btn" onclick="loadEntries()" aria-label="Refresh" id="refresh-btn">🔄</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('today',this)">Today</button>
+    <button class="tab" onclick="switchTab('all',this)">All entries</button>
+    <button class="tab" onclick="switchTab('summary',this)">Summary</button>
+  </div>
+
+  <div class="content" id="home-content">
+    <!-- injected by JS -->
+  </div>
+
+  <button class="fab" onclick="showScreen('s-add')" aria-label="Add expense">+</button>
+</div>
+
+<!-- ── ADD EXPENSE SCREEN ──────────────────────────────────────────────────── -->
+<div id="s-add" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" onclick="showScreen('s-home')" aria-label="Back">←</button>
+    <h1>Log expense</h1>
+  </div>
+
+  <div class="form-scroll">
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input class="amt-input" type="number" id="f-amount" placeholder="0"
+             inputmode="decimal" min="0" autofocus>
+    </div>
+
+    <div class="field">
+      <label>Category</label>
+      <div class="cat-grid" id="cat-grid"></div>
+    </div>
+
+    <div class="field">
+      <label>Description</label>
+      <input type="text" id="f-desc" placeholder="e.g. Office lunch, Petrol, School fees">
+    </div>
+
+    <div class="field">
+      <label>Paid by</label>
+      <div class="tag-row">
+        <span class="tag sel" onclick="pickTag(this,'paidby','Husband')">Husband</span>
+        <span class="tag" onclick="pickTag(this,'paidby','Wife')">Wife</span>
+        <span class="tag" onclick="pickTag(this,'paidby','Joint')">Joint</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Payment mode</label>
+      <div class="tag-row">
+        <span class="tag sel" onclick="pickTag(this,'mode','UPI')">UPI</span>
+        <span class="tag" onclick="pickTag(this,'mode','Card')">Card</span>
+        <span class="tag" onclick="pickTag(this,'mode','Cash')">Cash</span>
+        <span class="tag" onclick="pickTag(this,'mode','Net Banking')">Net Banking</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Travel / commute?</label>
+      <div class="tag-row">
+        <span class="tag sel" onclick="pickTag(this,'travel','No')">No</span>
+        <span class="tag" onclick="pickTag(this,'travel','Yes - Travel')">Travel</span>
+        <span class="tag" onclick="pickTag(this,'travel','Yes - Office commute')">Office commute</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="f-date">
+    </div>
+
+    <div class="field">
+      <label>Notes (optional)</label>
+      <input type="text" id="f-notes" placeholder="Any extra detail">
+    </div>
+
+    <button class="save-btn" id="save-btn" onclick="saveEntry()">Save expense</button>
+    <div style="height:24px;"></div>
+  </div>
+</div>
+
+<!-- ── SETTINGS SCREEN ─────────────────────────────────────────────────────── -->
+<div id="s-settings" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" onclick="showScreen('s-home')" aria-label="Back">←</button>
+    <h1>Settings</h1>
+  </div>
+
+  <div class="content">
+
+    <div class="settings-card">
+      <h3>🔗 Google Sheets connection</h3>
+      <p>Paste your Apps Script Web App URL below. Both you and your spouse use the same URL — all entries go to the same Google Sheet.</p>
+      <input type="url" id="webhook-url" placeholder="https://script.google.com/macros/s/…/exec"
+             oninput="saveUrl()">
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;">
+        <span class="status-dot dot-gray" id="conn-dot"></span>
+        <span id="conn-status" style="color:var(--muted);">Not connected</span>
+      </div>
+      <button class="sec-btn" onclick="testConnection()" style="margin-top:10px;">Test connection</button>
+    </div>
+
+    <div class="settings-card">
+      <h3>📋 Setup guide</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Go to <code>sheets.new</code> and create a blank Google Sheet.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Click <code>Extensions → Apps Script</code>. Delete all code and paste the <strong>Code.gs</strong> file content.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Click <code>▶ Run → setupSheet</code>. Grant permissions when prompted. This formats your sheet.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">Click <code>Deploy → New Deployment</code>. Set Type: <strong>Web App</strong>, Execute as: <strong>Me</strong>, Access: <strong>Anyone</strong>. Click Deploy.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text">Copy the Web App URL and paste it in the field above. Tap <strong>Test connection</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text">Share this URL with your spouse — they open it on their phone and enter the same Web App URL in settings.</div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>📱 Add to home screen</h3>
+      <p>On iPhone: tap the Share button in Safari → "Add to Home Screen".<br>On Android: tap the 3-dot menu in Chrome → "Add to Home screen".</p>
+      <p style="margin-top:8px;">This makes it feel like a native app — full screen, no browser chrome.</p>
+    </div>
+
+    <div class="settings-card">
+      <h3>🗑 Offline queue</h3>
+      <p id="queue-info">Loading…</p>
+      <button class="sec-btn" onclick="flushQueue()" id="flush-btn">Sync offline entries now</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CATS = [
+  {id:'Household',        ico:'🏠', label:'Household'},
+  {id:'Food & Dining',    ico:'🍽', label:'Food'},
+  {id:'Child / Education',ico:'👶', label:'Child'},
+  {id:'Transport',        ico:'🚗', label:'Transport'},
+  {id:'Healthcare',       ico:'🏥', label:'Health'},
+  {id:'Entertainment',    ico:'🎉', label:'Fun'},
+  {id:'Personal Care',    ico:'💄', label:'Personal'},
+  {id:'Others',           ico:'📦', label:'Others'},
+];
+
+const CAT_COLORS = {
+  'Household':'#EBF8FF','Food & Dining':'#FFFBEB','Child / Education':'#F0FFF4',
+  'Transport':'#EBF4FF','Healthcare':'#FFF5F5','Entertainment':'#FAF5FF',
+  'Personal Care':'#FFF0F6','Others':'#F7FAFC'
+};
+
+let selCat    = 'Household';
+let selPaidBy = 'Husband';
+let selMode   = 'UPI';
+let selTravel = 'No';
+let currentTab = 'today';
+let cachedEntries = [];
+let isLoading = false;
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+const LS = {
+  url:   () => localStorage.getItem('ff_url') || '',
+  queue: () => JSON.parse(localStorage.getItem('ff_queue') || '[]'),
+  setQ:  (q) => localStorage.setItem('ff_queue', JSON.stringify(q)),
+};
+
+function saveUrl() {
+  const url = document.getElementById('webhook-url').value.trim();
+  localStorage.setItem('ff_url', url);
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 's-home') { loadEntries(); updateQueueInfo(); }
+  if (id === 's-add')  { initAddForm(); }
+  if (id === 's-settings') { initSettings(); }
+}
+
+function switchTab(name, el) {
+  currentTab = name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderHome();
+}
+
+// ── Add form ──────────────────────────────────────────────────────────────────
+function initAddForm() {
+  selCat = 'Household'; selPaidBy = 'Husband'; selMode = 'UPI'; selTravel = 'No';
+
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('f-date').value = today;
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-desc').value = '';
+  document.getElementById('f-notes').value = '';
+
+  document.querySelectorAll('.tag').forEach(t => t.classList.remove('sel'));
+  document.querySelectorAll('[onclick*="Husband"]')[0]?.classList.add('sel');
+  document.querySelectorAll('[onclick*="UPI"]')[0]?.classList.add('sel');
+  document.querySelectorAll('[onclick*="\'No\'"]')[0]?.classList.add('sel');
+
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = CATS.map(c => `
+    <button class="cat-btn${c.id===selCat?' sel':''}" onclick="pickCat('${c.id}',this)">
+      <span class="ico">${c.ico}</span>${c.label}
+    </button>`).join('');
+
+  setTimeout(() => document.getElementById('f-amount').focus(), 100);
+}
+
+function pickCat(id, el) {
+  selCat = id;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function pickTag(el, group, val) {
+  if (group === 'paidby') selPaidBy = val;
+  else if (group === 'mode') selMode = val;
+  else if (group === 'travel') selTravel = val;
+  el.closest('.tag-row').querySelectorAll('.tag').forEach(t => t.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// ── Save entry ────────────────────────────────────────────────────────────────
+async function saveEntry() {
+  const amt = parseFloat(document.getElementById('f-amount').value);
+  if (!amt || amt <= 0) { toast('Enter a valid amount'); return; }
+
+  const entry = {
+    date:        document.getElementById('f-date').value || fmtDate(new Date()),
+    category:    selCat,
+    description: document.getElementById('f-desc').value.trim() || selCat,
+    amount:      amt,
+    paidBy:      selPaidBy,
+    mode:        selMode,
+    isTravel:    selTravel,
+    notes:       document.getElementById('f-notes').value.trim(),
+  };
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving…';
+
+  const url = LS.url();
+  if (!url) {
+    // Offline queue
+    const q = LS.queue();
+    q.push({ ...entry, _id: Date.now(), _queued: true });
+    LS.setQ(q);
+    toast('Saved offline — will sync when connected');
+    btn.disabled = false; btn.textContent = 'Save expense';
+    showScreen('s-home');
+    return;
+  }
+
+  try {
+    const res = await apiFetch({ action: 'add', ...entry });
+    if (res.ok) {
+      toast('Expense saved to Google Sheets!');
+      showScreen('s-home');
+    } else {
+      throw new Error(res.error || 'Unknown error');
+    }
+  } catch(e) {
+    const q = LS.queue();
+    q.push({ ...entry, _id: Date.now(), _queued: true });
+    LS.setQ(q);
+    toast('Saved offline (will sync later)');
+    showScreen('s-home');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save expense';
+  }
+}
+
+// ── Load & render entries ──────────────────────────────────────────────────────
+async function loadEntries() {
+  if (isLoading) return;
+  const url = LS.url();
+  if (!url) { renderHome(); return; }
+
+  isLoading = true;
+  document.getElementById('refresh-btn').innerHTML = '<span class="spinner" style="border-color:rgba(255,255,255,0.3);border-top-color:#fff;"></span>';
+
+  try {
+    const res = await apiFetch(null, `action=entries&limit=200`);
+    if (res.ok) {
+      cachedEntries = res.entries || [];
+    }
+  } catch(e) {
+    // use cache
+  } finally {
+    isLoading = false;
+    document.getElementById('refresh-btn').textContent = '🔄';
+    renderHome();
+  }
+}
+
+function renderHome() {
+  const todayStr = fmtDate(new Date());
+  document.getElementById('today-label').textContent =
+    new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
+
+  const todayEntries = cachedEntries.filter(e => e.date === todayStr);
+  const todaySum = todayEntries.reduce((s,e) => s + e.amount, 0);
+  const allSum   = cachedEntries.reduce((s,e) => s + e.amount, 0);
+  const queue    = LS.queue();
+
+  let html = '';
+
+  if (currentTab === 'today') {
+    html += `<div class="cards">
+      <div class="card accent"><div class="lbl">Today's total</div><div class="val">${fmt(todaySum)}</div></div>
+      <div class="card"><div class="lbl">All time</div><div class="val">${fmt(allSum)}</div></div>
+    </div>`;
+
+    if (queue.length) {
+      html += `<div style="background:#FFF3CD;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#7D5A00;">
+        📶 ${queue.length} offline entr${queue.length>1?'ies':'y'} waiting to sync.
+        <a href="#" onclick="flushQueue();return false;" style="color:#7D5A00;font-weight:600;">Sync now</a>
+      </div>`;
+    }
+
+    if (todayEntries.length === 0 && queue.length === 0) {
+      html += `<div class="empty"><div class="ico">🧾</div><p>No expenses logged today.<br>Tap + to add one.</p></div>`;
+    } else {
+      html += todayEntries.map(entryHTML).join('');
+    }
+
+  } else if (currentTab === 'all') {
+    if (cachedEntries.length === 0 && queue.length === 0) {
+      html += `<div class="empty"><div class="ico">🧾</div><p>No entries yet.</p></div>`;
+    } else {
+      html += `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${cachedEntries.length} entries · Pull-to-refresh to update</div>`;
+      html += cachedEntries.map(entryHTML).join('');
+      if (queue.length) {
+        html += `<div style="font-size:12px;color:var(--muted);margin:10px 0 6px;">Offline (${queue.length})</div>`;
+        html += queue.map(e => entryHTML({...e, id: e._id, loggedAt:'Pending sync'})).join('');
+      }
+    }
+
+  } else if (currentTab === 'summary') {
+    html += renderSummary(allSum);
+  }
+
+  document.getElementById('home-content').innerHTML = html;
+}
+
+function entryHTML(e) {
+  const cat = CATS.find(c => c.id === e.category) || {ico:'📦'};
+  const bg  = CAT_COLORS[e.category] || '#F7FAFC';
+  return `<div class="entry">
+    <div class="entry-icon" style="background:${bg}">${cat.ico}</div>
+    <div class="entry-body">
+      <div class="name">${e.description || e.category}</div>
+      <div class="meta">${e.category} · ${e.paidBy} · ${e.mode} · ${e.date}</div>
+    </div>
+    <div class="entry-right">
+      <div class="amt">${fmt(e.amount)}</div>
+      <button class="del" onclick="deleteEntry('${e.id}')" aria-label="Delete">✕</button>
+    </div>
+  </div>`;
+}
+
+function renderSummary(allSum) {
+  const byPerson = {}, byCat = {};
+  cachedEntries.forEach(e => {
+    byPerson[e.paidBy] = (byPerson[e.paidBy]||0) + e.amount;
+    byCat[e.category]  = (byCat[e.category] ||0) + e.amount;
+  });
+
+  const todayStr = fmtDate(new Date());
+  const todaySum = cachedEntries.filter(e=>e.date===todayStr).reduce((s,e)=>s+e.amount,0);
+
+  let h = `<div class="cards">
+    <div class="card accent"><div class="lbl">All time</div><div class="val">${fmt(allSum)}</div></div>
+    <div class="card"><div class="lbl">Today</div><div class="val">${fmt(todaySum)}</div></div>
+  </div>`;
+
+  h += `<div class="settings-card" style="margin-bottom:12px;">
+    <h3 style="margin-bottom:10px;">By person</h3>`;
+  Object.entries(byPerson).forEach(([who, amt]) => {
+    const pct = allSum > 0 ? Math.round(amt/allSum*100) : 0;
+    h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:14px;font-weight:600;">${who}</span>
+      <span style="font-size:14px;">${fmt(amt)} <span style="font-size:12px;color:var(--muted);">(${pct}%)</span></span>
+    </div>
+    <div style="background:var(--light);border-radius:4px;height:6px;margin-bottom:10px;">
+      <div style="background:var(--teal);height:6px;border-radius:4px;width:${pct}%"></div>
+    </div>`;
+  });
+  h += `</div>`;
+
+  h += `<div class="settings-card">
+    <h3 style="margin-bottom:10px;">By category</h3>`;
+  Object.entries(byCat).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
+    const catObj = CATS.find(c=>c.id===cat)||{ico:'📦'};
+    const pct = allSum > 0 ? Math.round(amt/allSum*100) : 0;
+    h += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:18px;">${catObj.ico}</span>
+      <div style="flex:1;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:13px;font-weight:600;">${cat}</span>
+          <span style="font-size:13px;">${fmt(amt)}</span>
+        </div>
+        <div style="background:var(--light);border-radius:4px;height:5px;">
+          <div style="background:var(--navy);height:5px;border-radius:4px;width:${pct}%"></div>
+        </div>
+      </div>
+    </div>`;
+  });
+  h += `</div>`;
+  return h;
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+async function deleteEntry(id) {
+  if (!confirm('Delete this expense?')) return;
+  const url = LS.url();
+  if (!url) {
+    const q = LS.queue().filter(e => String(e._id) !== String(id));
+    LS.setQ(q);
+    cachedEntries = cachedEntries.filter(e => String(e.id) !== String(id));
+    renderHome(); toast('Deleted'); return;
+  }
+  try {
+    await apiFetch({ action: 'delete', id });
+    cachedEntries = cachedEntries.filter(e => String(e.id) !== String(id));
+    renderHome(); toast('Deleted');
+  } catch(e) { toast('Could not delete — try again'); }
+}
+
+// ── Offline queue sync ────────────────────────────────────────────────────────
+async function flushQueue() {
+  const q = LS.queue();
+  if (!q.length) { toast('No offline entries to sync'); return; }
+  const url = LS.url();
+  if (!url) { toast('Set up your Google Sheets URL first'); return; }
+
+  toast(`Syncing ${q.length} entries…`);
+  const entries = q.map(e => ({
+    action:'add', date:e.date, category:e.category, description:e.description,
+    amount:e.amount, paidBy:e.paidBy, mode:e.mode, isTravel:e.isTravel, notes:e.notes,
+  }));
+
+  try {
+    const res = await apiFetch({ action:'bulk_add', entries });
+    if (res.ok) {
+      LS.setQ([]);
+      toast(`✅ Synced ${res.added} entries!`);
+      await loadEntries();
+    } else throw new Error();
+  } catch(e) { toast('Sync failed — check connection'); }
+  updateQueueInfo();
+}
+
+function updateQueueInfo() {
+  const q = LS.queue();
+  const el = document.getElementById('queue-info');
+  if (el) el.textContent = q.length
+    ? `${q.length} entr${q.length>1?'ies':'y'} waiting to sync to Google Sheets.`
+    : 'All entries are synced.';
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function initSettings() {
+  document.getElementById('webhook-url').value = LS.url();
+  updateQueueInfo();
+  updateConnStatus('idle');
+}
+
+async function testConnection() {
+  const url = LS.url();
+  if (!url) { toast('Paste your Web App URL first'); return; }
+  updateConnStatus('testing');
+  try {
+    const res = await apiFetch(null, 'action=ping');
+    if (res.ok) { updateConnStatus('ok'); toast('✅ Connected to Google Sheets!'); }
+    else throw new Error();
+  } catch(e) { updateConnStatus('error'); toast('❌ Could not connect — check URL'); }
+}
+
+function updateConnStatus(state) {
+  const dot = document.getElementById('conn-dot');
+  const txt = document.getElementById('conn-status');
+  if (state === 'ok')      { dot.className='status-dot dot-green'; txt.textContent='Connected'; }
+  else if (state==='error'){ dot.className='status-dot dot-red';   txt.textContent='Connection failed'; }
+  else if (state==='testing'){ dot.className='status-dot dot-gray'; txt.textContent='Testing…'; }
+  else { dot.className='status-dot dot-gray'; txt.textContent = LS.url() ? 'URL saved' : 'Not connected'; }
+}
+
+// ── API helper ────────────────────────────────────────────────────────────────
+async function apiFetch(body, qs='') {
+  const base = LS.url();
+  if (!base) throw new Error('No URL');
+  const url = qs ? `${base}?${qs}` : base;
+  const opts = body
+    ? { method:'POST', body: JSON.stringify(body) }
+    : { method:'GET' };
+
+  // Apps Script requires no-cors for GET, but we'll try with cors first
+  const res = await fetch(url, { ...opts, redirect:'follow' });
+  return res.json();
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+function fmtDate(d) {
+  const day  = String(d.getDate()).padStart(2,'0');
+  const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${day}-${mons[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+let toastTimer;
+function toast(msg, dur=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadEntries();
+</script>
+</body>
+</html>
