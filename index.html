@@ -410,7 +410,7 @@ async function loadEntries() {
   try {
     const res = await apiFetch(null, `action=entries&limit=200`);
     if (res.ok) {
-      cachedEntries = res.entries || [];
+      cachedEntries = (res.entries || []).map(e => ({ ...e, date: normaliseDate(e.date) }));
     }
   } catch(e) {
     // use cache
@@ -422,11 +422,10 @@ async function loadEntries() {
 }
 
 function renderHome() {
-  const todayStr = fmtDate(new Date());
   document.getElementById('today-label').textContent =
     new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
 
-  const todayEntries = cachedEntries.filter(e => e.date === todayStr);
+  const todayEntries = cachedEntries.filter(e => isSameDay(e.date));
   const todaySum = todayEntries.reduce((s,e) => s + e.amount, 0);
   const allSum   = cachedEntries.reduce((s,e) => s + e.amount, 0);
   const queue    = LS.queue();
@@ -494,8 +493,7 @@ function renderSummary(allSum) {
     byCat[e.category]  = (byCat[e.category] ||0) + e.amount;
   });
 
-  const todayStr = fmtDate(new Date());
-  const todaySum = cachedEntries.filter(e=>e.date===todayStr).reduce((s,e)=>s+e.amount,0);
+  const todaySum = cachedEntries.filter(e=>isSameDay(e.date)).reduce((s,e)=>s+e.amount,0);
 
   let h = `<div class="cards">
     <div class="card accent"><div class="lbl">All time</div><div class="val">${fmt(allSum)}</div></div>
@@ -614,6 +612,44 @@ function fmtDate(d) {
   const day  = String(d.getDate()).padStart(2,'0');
   const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${day}-${mons[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+// Normalise any date string from Google Sheets into dd-MMM-yyyy
+// Handles: "04-Jun-2026", "4-Jun-2026", "2026-06-04", "04/06/2026", "6/4/2026"
+function normaliseDate(raw) {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Already correct format dd-Mon-yyyy
+  if (/^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(s)) {
+    const [d,m,y] = s.split('-');
+    return String(d).padStart(2,'0') + '-' + m + '-' + y;
+  }
+
+  // ISO: yyyy-mm-dd or yyyy/mm/dd
+  if (/^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}/.test(s)) {
+    const parts = s.split(/[-\/]/);
+    const dt = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+    return fmtDate(dt);
+  }
+
+  // dd/mm/yyyy or d/m/yyyy (Indian format)
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const parts = s.split('/');
+    const dt = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+    return fmtDate(dt);
+  }
+
+  // Google Sheets Date serial or any parseable string
+  const parsed = new Date(s);
+  if (!isNaN(parsed)) return fmtDate(parsed);
+
+  return s; // fallback: return as-is
+}
+
+function isSameDay(dateStr) {
+  return normaliseDate(dateStr) === fmtDate(new Date());
 }
 
 let toastTimer;
