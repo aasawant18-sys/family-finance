@@ -3,9 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Family Finance">
+<meta name="application-name" content="Family Finance">
 <meta name="theme-color" content="#1B3A6B">
+<meta name="description" content="Family expense tracker — shared between husband and wife">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Family Finance</title>
 <style>
   :root {
@@ -928,6 +934,25 @@ function toast(msg, dur=2500) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadEntries();
+
+// ── Listen for SW background sync trigger ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SYNC_QUEUE') {
+      flushQueue();
+    }
+  });
+}
+
+// ── Service Worker Registration ───────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
 </script>
 </body>
 </html>
