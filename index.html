@@ -176,6 +176,7 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('today',this)">Today</button>
     <button class="tab" onclick="switchTab('all',this)">All entries</button>
+    <button class="tab" onclick="switchTab('monthly',this)">Monthly</button>
     <button class="tab" onclick="switchTab('summary',this)">Summary</button>
   </div>
 
@@ -421,7 +422,41 @@ async function loadEntries() {
   }
 }
 
-function renderHome() {
+let selectedMonth = null; // null = current month; format "Jun-2026"
+
+function currentMonthKey() {
+  const d = new Date();
+  const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return mons[d.getMonth()] + '-' + d.getFullYear();
+}
+
+function monthKey(dateStr) {
+  // dateStr is already normalised to dd-MMM-yyyy
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return parts[1] + '-' + parts[2]; // "Jun-2026"
+  return '';
+}
+
+function allMonths() {
+  const keys = new Set(cachedEntries.map(e => monthKey(e.date)).filter(Boolean));
+  const cur = currentMonthKey();
+  keys.add(cur);
+  // Sort descending: most recent first
+  return Array.from(keys).sort((a, b) => {
+    const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const [am, ay] = a.split('-'); const [bm, by] = b.split('-');
+    if (ay !== by) return parseInt(by) - parseInt(ay);
+    return mons.indexOf(bm) - mons.indexOf(am); // WRONG order, fix:
+  }).sort((a, b) => {
+    const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const [am, ay] = a.split('-'); const [bm, by] = b.split('-');
+    if (ay !== by) return parseInt(by) - parseInt(ay);
+    return mons.indexOf(bm) - mons.indexOf(am);  // higher month index = later = first
+  });
+}
+
+
   document.getElementById('today-label').textContent =
     new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
 
@@ -463,6 +498,9 @@ function renderHome() {
       }
     }
 
+  } else if (currentTab === 'monthly') {
+    html += renderMonthly();
+
   } else if (currentTab === 'summary') {
     html += renderSummary(allSum);
   }
@@ -484,6 +522,232 @@ function entryHTML(e) {
       <button class="del" onclick="deleteEntry('${e.id}')" aria-label="Delete">✕</button>
     </div>
   </div>`;
+}
+
+function renderMonthly() {
+  if (!selectedMonth) selectedMonth = currentMonthKey();
+  const months = allMonths();
+  const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Month picker
+  let h = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <button onclick="shiftMonth(-1)" style="background:var(--light);border:1.5px solid var(--border);border-radius:var(--rs);padding:6px 16px;font-size:20px;cursor:pointer;color:var(--text);">&#8249;</button>
+    <div style="text-align:center;">
+      <div style="font-size:19px;font-weight:700;color:var(--navy);">${selectedMonth.replace('-',' ')}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:1px;">tap arrows to switch</div>
+    </div>
+    <button onclick="shiftMonth(1)" style="background:var(--light);border:1.5px solid var(--border);border-radius:var(--rs);padding:6px 16px;font-size:20px;cursor:pointer;color:var(--text);">&#8250;</button>
+  </div>`;
+
+  // Data
+  const mEntries = cachedEntries.filter(e => monthKey(e.date) === selectedMonth);
+  const mTotal   = mEntries.reduce((s,e) => s + e.amount, 0);
+  const hTotal   = mEntries.filter(e => e.paidBy === 'Husband').reduce((s,e) => s + e.amount, 0);
+  const wTotal   = mEntries.filter(e => e.paidBy === 'Wife').reduce((s,e) => s + e.amount, 0);
+  const tTotal   = mEntries.filter(e => e.isTravel && e.isTravel !== 'No').reduce((s,e) => s + e.amount, 0);
+  const isCurrentMonth = selectedMonth === currentMonthKey();
+  const todayAmt = isCurrentMonth ? cachedEntries.filter(e => isSameDay(e.date)).reduce((s,e) => s+e.amount, 0) : 0;
+
+  // Days calc
+  const [selMon, selYr] = selectedMonth.split('-');
+  const monIdx    = MONS.indexOf(selMon);
+  const daysInMon = new Date(parseInt(selYr), monIdx+1, 0).getDate();
+  const today     = new Date();
+  const elapsedDays = isCurrentMonth ? Math.max(1, today.getDate()) : daysInMon;
+  const dailyAvg  = elapsedDays > 0 ? mTotal / elapsedDays : 0;
+  const projected = isCurrentMonth ? Math.round(dailyAvg * daysInMon) : mTotal;
+
+  // Prev month comparison
+  const prevMonIdx = monIdx === 0 ? 11 : monIdx - 1;
+  const prevYr     = monIdx === 0 ? parseInt(selYr) - 1 : parseInt(selYr);
+  const prevKey    = MONS[prevMonIdx] + '-' + prevYr;
+  const prevTotal  = cachedEntries.filter(e => monthKey(e.date) === prevKey).reduce((s,e) => s+e.amount, 0);
+  const momChange  = prevTotal > 0 ? ((mTotal - prevTotal) / prevTotal * 100) : null;
+  const momColor   = momChange !== null && momChange <= 0 ? '#6EE7B7' : '#FCA5A5';
+  const momBg      = momChange !== null && momChange <= 0 ? 'rgba(52,211,153,0.2)' : 'rgba(252,165,165,0.2)';
+
+  // Hero card
+  h += `<div style="background:var(--navy);border-radius:var(--r);padding:18px 16px 14px;margin-bottom:10px;position:relative;overflow:hidden;">
+    <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:2px;">Total spend</div>
+    <div style="font-size:36px;font-weight:800;color:#fff;line-height:1.1;">${fmt(mTotal)}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:3px;">${mEntries.length} transaction${mEntries.length!==1?'s':''}</div>
+    ${momChange !== null ? `<div style="position:absolute;top:16px;right:14px;background:${momBg};border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;color:${momColor};">${momChange<=0?'&#9660;':'&#9650;'} ${Math.abs(momChange).toFixed(1)}% vs ${prevKey}</div>` : ''}
+    ${isCurrentMonth ? `
+    <div style="margin-top:12px;background:rgba(255,255,255,0.08);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:rgba(255,255,255,0.5);">Daily avg</div>
+        <div style="font-size:15px;font-weight:700;color:#fff;">${fmt(dailyAvg)}</div>
+      </div>
+      <div style="width:1px;height:28px;background:rgba(255,255,255,0.15);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:rgba(255,255,255,0.5);">Day ${elapsedDays}/${daysInMon}</div>
+        <div style="font-size:15px;font-weight:700;color:#fff;">${Math.round(elapsedDays/daysInMon*100)}% done</div>
+      </div>
+      <div style="width:1px;height:28px;background:rgba(255,255,255,0.15);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:rgba(255,255,255,0.5);">Projected</div>
+        <div style="font-size:15px;font-weight:700;color:#fff;">${fmt(projected)}</div>
+      </div>
+    </div>` : ''}
+  </div>`;
+
+  // Split cards
+  h += `<div class="cards" style="margin-bottom:10px;">
+    <div class="card"><div class="lbl">&#128104; Husband</div><div class="val" style="font-size:16px;">${fmt(hTotal)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">${mTotal>0?Math.round(hTotal/mTotal*100):0}% of total</div></div>
+    <div class="card"><div class="lbl">&#128105; Wife</div><div class="val" style="font-size:16px;">${fmt(wTotal)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">${mTotal>0?Math.round(wTotal/mTotal*100):0}% of total</div></div>
+    <div class="card"><div class="lbl">&#9992;&#65039; Travel / Office</div><div class="val" style="font-size:16px;">${fmt(tTotal)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">${mTotal>0?Math.round(tTotal/mTotal*100):0}% of total</div></div>
+    <div class="card${isCurrentMonth?' acc':''}"><div class="lbl">&#128197; Today</div><div class="val" style="font-size:16px;">${isCurrentMonth?fmt(todayAmt):'—'}</div>${isCurrentMonth?`<div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;">${dailyAvg>0?((todayAmt/dailyAvg)*100).toFixed(0)+'% of avg':''}</div>`:'<div style="font-size:10px;color:var(--muted);">past month</div>'}</div>
+  </div>`;
+
+  if (mEntries.length === 0) {
+    h += `<div class="empty"><div class="ico">&#128467;</div><p>No expenses in ${selectedMonth.replace('-',' ')}.</p></div>`;
+    return h;
+  }
+
+  // Spend trend sparkline (day-by-day cumulative)
+  const byDay = {};
+  mEntries.forEach(e => { byDay[e.date] = (byDay[e.date]||0) + e.amount; });
+  const allDays = Array.from({length: daysInMon}, (_,i) => {
+    const d = new Date(parseInt(selYr), monIdx, i+1);
+    const key = fmtDate(d);
+    return { day: i+1, amt: byDay[key] || 0, key };
+  });
+  const cumDays  = [];
+  let cum = 0;
+  allDays.forEach(d => { cum += d.amt; cumDays.push({...d, cum}); });
+  const maxCum   = cum || 1;
+  const maxDaily = Math.max(...allDays.map(d => d.amt)) || 1;
+  const svgW = 280, svgH = 56;
+  const pts = cumDays.filter(d => d.cum > 0 || d.day <= elapsedDays);
+  const sparkPts = pts.map(d => {
+    const x = ((d.day-1) / (daysInMon-1)) * (svgW-10) + 5;
+    const y = svgH - 6 - (d.cum / maxCum) * (svgH - 12);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const areaPath = pts.length > 0
+    ? `M5,${svgH} L${pts.map(d => {
+        const x = ((d.day-1)/(daysInMon-1))*(svgW-10)+5;
+        const y = svgH-6-(d.cum/maxCum)*(svgH-12);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' L')} L${((pts[pts.length-1].day-1)/(daysInMon-1))*(svgW-10)+5},${svgH} Z`
+    : '';
+
+  h += `<div class="settings-card" style="margin-bottom:10px;padding:14px 12px 10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="margin:0;">Cumulative spend</h3>
+      <span style="font-size:11px;color:var(--muted);">day-by-day</span>
+    </div>
+    <svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;height:${svgH}px;overflow:visible;">
+      <defs>
+        <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0D7377" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#0D7377" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${areaPath ? `<path d="${areaPath}" fill="url(#sg)"/>` : ''}
+      ${pts.length > 1 ? `<polyline points="${sparkPts}" fill="none" stroke="#0D7377" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+      ${pts.length > 0 ? (() => {
+        const last = pts[pts.length-1];
+        const lx = ((last.day-1)/(daysInMon-1))*(svgW-10)+5;
+        const ly = svgH-6-(last.cum/maxCum)*(svgH-12);
+        return `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="4" fill="#0D7377"/>`;
+      })() : ''}
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px;">
+      <span>1 ${selMon}</span><span>${Math.round(daysInMon/2)} ${selMon}</span><span>${daysInMon} ${selMon}</span>
+    </div>
+  </div>`;
+
+  // Daily spend bars
+  h += `<div class="settings-card" style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin:0;">Day-wise spend</h3>
+      <span style="font-size:11px;color:var(--muted);">avg ${fmt(dailyAvg)}/day</span>
+    </div>`;
+  const activeDays = allDays.filter(d => d.amt > 0);
+  if (activeDays.length === 0) {
+    h += `<div style="font-size:13px;color:var(--muted);text-align:center;padding:10px 0;">No spends recorded</div>`;
+  } else {
+    activeDays.sort((a,b) => {
+      const da = new Date(parseInt(selYr), monIdx, a.day);
+      const db = new Date(parseInt(selYr), monIdx, b.day);
+      return db - da;
+    }).forEach(d => {
+      const pct = Math.round(d.amt / maxDaily * 100);
+      const isToday = isSameDay(d.key);
+      const dayEntries = mEntries.filter(e => e.date === d.key);
+      const label = new Date(parseInt(selYr), monIdx, d.day)
+        .toLocaleDateString('en-IN', {weekday:'short', day:'numeric'});
+      h += `<div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:12px;font-weight:600;">${label}${isToday?' <span style="font-size:9px;background:#E8F8F7;color:var(--teal);padding:1px 5px;border-radius:4px;">Today</span>':''}</span>
+          <div style="text-align:right;">
+            <span style="font-size:13px;font-weight:700;">${fmt(d.amt)}</span>
+            <span style="font-size:10px;color:var(--muted);margin-left:4px;">${dayEntries.length} item${dayEntries.length!==1?'s':''}</span>
+          </div>
+        </div>
+        <div style="background:var(--light);border-radius:4px;height:6px;">
+          <div style="background:${isToday?'var(--teal)':'var(--navy)'};height:6px;border-radius:4px;width:${pct}%;"></div>
+        </div>
+      </div>`;
+    });
+  }
+  h += `</div>`;
+
+  // Category breakdown
+  const byCat = {};
+  mEntries.forEach(e => { byCat[e.category] = (byCat[e.category]||0) + e.amount; });
+  h += `<div class="settings-card" style="margin-bottom:10px;">
+    <h3 style="margin-bottom:12px;">By category</h3>`;
+  Object.entries(byCat).sort((a,b) => b[1]-a[1]).forEach(([cat, amt]) => {
+    const catObj = CATS.find(c => c.id === cat) || {ico:'&#128230;'};
+    const pct    = mTotal > 0 ? Math.round(amt/mTotal*100) : 0;
+    const count  = mEntries.filter(e => e.category === cat).length;
+    h += `<div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">${catObj.ico}</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;">${cat}</div>
+            <div style="font-size:10px;color:var(--muted);">${count} item${count!==1?'s':''}</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:700;">${fmt(amt)}</div>
+          <div style="font-size:10px;color:var(--muted);">${pct}%</div>
+        </div>
+      </div>
+      <div style="background:var(--light);border-radius:4px;height:6px;">
+        <div style="background:var(--teal);height:6px;border-radius:4px;width:${pct}%;"></div>
+      </div>
+    </div>`;
+  });
+  h += `</div>`;
+
+  // All transactions for the month
+  h += `<div class="settings-card">
+    <h3 style="margin-bottom:10px;">All transactions</h3>`;
+  [...mEntries].sort((a,b) => {
+    const MONS2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const pa = a.date.split('-'), pb = b.date.split('-');
+    const da = new Date(parseInt(pa[2]), MONS2.indexOf(pa[1]), parseInt(pa[0]));
+    const db = new Date(parseInt(pb[2]), MONS2.indexOf(pb[1]), parseInt(pb[0]));
+    return db - da;
+  }).forEach(e => { h += entryHTML(e); });
+  h += `</div>`;
+
+  return h;
+}
+
+function shiftMonth(dir) {
+  const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const months = allMonths(); // sorted newest first
+  const idx = months.indexOf(selectedMonth);
+  const newIdx = idx - dir; // dir=1 means go forward in time = lower index
+  if (newIdx >= 0 && newIdx < months.length) {
+    selectedMonth = months[newIdx];
+    renderHome();
+  }
 }
 
 function renderSummary(allSum) {
